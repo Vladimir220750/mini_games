@@ -1,0 +1,17 @@
+{
+  "name": "rps-sr-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9",
+  "scripts": {
+    "dev": "concurrently -n web,api -c green,cyan \"pnpm --filter @apps/web dev\" \"pnpm --filter @apps/api dev\"",
+    "build": "pnpm -w -r build",
+    "lint": "pnpm -w -r lint",
+    "test": "pnpm -w -r test",
+    "migrate": "pnpm --filter @apps/api prisma migrate deploy"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0",
+    "typescript": "^5.5.4"
+  }
+}

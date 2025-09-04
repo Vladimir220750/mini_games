@@ -1,0 +1,13 @@
+{
+  "name": "@packages/shared",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "echo \"(shared) lint ok\"",
+    "test": "echo \"(shared) tests TBD\""
+  },
+  "devDependencies": { "typescript": "^5.5.4" }
+}
