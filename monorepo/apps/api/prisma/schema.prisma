@@ -1,42 +1,55 @@
-generator client { provider = "prisma-client-js" }
-datasource db { provider = "postgresql" url = env("DATABASE_URL") }
+// monorepo/apps/api/prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MatchStatus {
+  WAITING_FOR_PLAYERS
+  COMMIT_PHASE
+  REVEAL_PHASE
+  COMPLETED
+  CANCELLED
+}
+
+enum RpsChoice {
+  ROCK
+  PAPER
+  SCISSORS
+}
 
 model User {
   id        String   @id @default(uuid())
   wallet    String   @unique
   banned    Boolean  @default(false)
   createdAt DateTime @default(now())
-  matchesA  Match[]  @relation("creator")
-  matchesB  Match[]  @relation("opponent")
-}
-
-enum MatchStatus {
-  CREATED
-  READY
-  IN_GAME
-  REVEAL
-  PAYOUT
-  DONE
-  ABORTED
+  matchesA  Match[]  @relation("playerA")
+  matchesB  Match[]  @relation("playerB")
 }
 
 model Match {
   id             String      @id @default(uuid())
-  programKey     String?
-  creator        User        @relation("creator", fields: [creatorId], references: [id])
-  creatorId      String
-  opponent       User?       @relation("opponent", fields: [opponentId], references: [id])
-  opponentId     String?
-  stakeLamports  BigInt
-  status         MatchStatus @default(CREATED)
-  feeBps         Int         @default(300)
-  feeWallet      String
-  commitDeadline Int
-  revealDeadline Int
-  paidOut        Boolean     @default(false)
+  status         MatchStatus @default(WAITING_FOR_PLAYERS)
+  wager          BigInt
+  playerAId      String
+  playerA        User        @relation("playerA", fields: [playerAId], references: [id])
+  playerBId      String?
+  playerB        User?       @relation("playerB", fields: [playerBId], references: [id])
+  commitA        String?
+  commitB        String?
+  revealA        RpsChoice?
+  revealB        RpsChoice?
+  winnerId       String?
+  winner         User?       @relation("winner", fields: [winnerId], references: [id])
+  commitDeadline DateTime?
+  revealDeadline DateTime?
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
-  AuditLog       AuditLog[]
+  auditLogs      AuditLog[]
 }
 
 model AuditLog {
@@ -45,5 +58,5 @@ model AuditLog {
   type      String
   payload   Json
   createdAt DateTime @default(now())
-  Match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
 }

@@ -1,11 +1,36 @@
-export type MatchStatus = "CREATED" | "READY" | "IN_GAME" | "REVEAL" | "PAYOUT" | "DONE" | "ABORTED";
-export type RpsChoice = "rock" | "paper" | "scissors";
-export interface WsEvents {
-  status: (payload: any) => void;
-  player_joined: (payload: any) => void;
-  both_deposited: (payload: any) => void;
-  committed: (payload: any) => void;
-  revealed: (payload: any) => void;
-  payout_sent: (payload: any) => void;
-  error: (payload: any) => void;
+// monorepo/packages/shared/src/index.ts
+export enum RpsChoice {
+  Rock = 'rock',
+  Paper = 'paper',
+  Scissors = 'scissors',
 }
+
+export enum MatchStatus {
+  WaitingForPlayers = 'waiting_for_players',
+  CommitPhase = 'commit_phase',
+  RevealPhase = 'reveal_phase',
+  Completed = 'completed',
+  Cancelled = 'cancelled',
+}
+
+export interface Match {
+  id: string;
+  status: MatchStatus;
+  wager: string;
+  playerAId: string;
+  playerBId?: string;
+  winnerId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const WsEvents = {
+  MatchCreated: 'match:created',
+  MatchJoined: 'match:joined',
+  MatchUpdated: 'match:updated',
+  MatchCommitted: 'match:committed',
+  MatchRevealed: 'match:revealed',
+  MatchCompleted: 'match:completed',
+} as const;
+
+export type WsEvent = (typeof WsEvents)[keyof typeof WsEvents];
