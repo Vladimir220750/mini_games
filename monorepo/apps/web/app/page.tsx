@@ -1,58 +1,72 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { io, type Socket } from "socket.io-client";
+import { useEffect } from "react";
+import { io } from "socket.io-client";
 import { MatchStatus, WsEvents } from "@packages/shared";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useRpsStore } from "../lib/store";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || API_URL;
 
 export default function Home() {
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [matchId, setMatchId] = useState<string | null>(null);
-  const [status, setStatus] = useState<MatchStatus | null>(null);
-  const [log, setLog] = useState<string[]>([]);
+  const { publicKey } = useWallet();
+  const {
+    wallet,
+    setWallet,
+    matchId,
+    setMatchId,
+    status,
+    setStatus,
+    log,
+    addLog,
+  } = useRpsStore();
+
+  useEffect(() => {
+    setWallet(publicKey ? publicKey.toBase58() : null);
+  }, [publicKey, setWallet]);
 
   useEffect(() => {
     if (!matchId) return;
     const s = io(SOCKET_URL, { transports: ["websocket"] });
-    setSocket(s);
 
     s.on("connect", () => s.emit("match:subscribe", matchId));
     s.on(WsEvents.MatchJoined, (p: { id: string; status: MatchStatus }) => {
       setStatus(p.status);
-      setLog((l) => [...l, `player joined: ${JSON.stringify(p)}`]);
+      addLog(`player joined: ${JSON.stringify(p)}`);
     });
     s.on(WsEvents.MatchCommitted, (p: unknown) =>
-      setLog((l) => [...l, `commit: ${JSON.stringify(p)}`])
+      addLog(`commit: ${JSON.stringify(p)}`)
     );
     s.on(WsEvents.MatchRevealed, (p: unknown) =>
-      setLog((l) => [...l, `reveal: ${JSON.stringify(p)}`])
+      addLog(`reveal: ${JSON.stringify(p)}`)
     );
 
     return () => {
       s.disconnect();
     };
-  }, [matchId]);
+  }, [matchId, addLog, setStatus]);
 
   const createMatch = async () => {
+    if (!wallet) return;
     const res = await fetch(`${API_URL}/api/matches`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ wallet: "playerA", wager: "1" }),
+      body: JSON.stringify({ wallet, wager: "1" }),
     });
     const data: { id: string } = await res.json();
     setMatchId(data.id);
     setStatus(MatchStatus.WaitingForPlayers);
-    setLog((l) => [...l, `match created: ${data.id}`]);
+    addLog(`match created: ${data.id}`);
   };
 
   const joinMatch = async () => {
-    if (!matchId) return;
+    if (!wallet || !matchId) return;
     await fetch(`${API_URL}/api/matches/${matchId}/join`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ wallet: "playerB" }),
+      body: JSON.stringify({ wallet }),
     });
   };
 
@@ -60,8 +74,16 @@ export default function Home() {
     <main style={{ maxWidth: 760, margin: "40px auto", padding: "0 16px" }}>
       <h1>RPS on Solana (skeleton)</h1>
 
+      <WalletMultiButton />
+
+      {wallet && (
+        <p style={{ marginTop: 16 }}>
+          Wallet: <code>{wallet}</code>
+        </p>
+      )}
+
       {!matchId && (
-        <button onClick={createMatch} style={{ padding: "8px 12px" }}>
+        <button onClick={createMatch} style={{ padding: "8px 12px", marginTop: 16 }}>
           Create match
         </button>
       )}
@@ -95,7 +117,7 @@ export default function Home() {
       )}
 
       <p style={{ opacity: 0.7, marginTop: 24 }}>
-          Wallet connect + commit/reveal UI — coming next.
+        Commit/reveal UI — coming next.
       </p>
     </main>
   );
