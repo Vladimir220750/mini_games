@@ -1,4 +1,3 @@
-// monorepo/packages/shared/src/index.ts
 export enum RpsChoice {
   Rock = 'rock',
   Paper = 'paper',
@@ -31,6 +30,7 @@ export const WsEvents = {
   MatchCommitted: 'match:committed',
   MatchRevealed: 'match:revealed',
   MatchCompleted: 'match:completed',
+  MatchCancelled: 'match:cancelled',
 } as const;
 
 export type WsEvent = (typeof WsEvents)[keyof typeof WsEvents];
