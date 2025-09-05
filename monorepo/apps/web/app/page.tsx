@@ -1,48 +1,102 @@
 "use client";
-import { io } from "socket.io-client";
-import { useEffect, useState } from "react";
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:4000";
+import { useEffect, useState } from "react";
+import { io, type Socket } from "socket.io-client";
+import { MatchStatus, WsEvents } from "@packages/shared";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || API_URL;
 
 export default function Home() {
-  const [matchId, setMatchId] = useState<string>("");
-  const [status, setStatus] = useState<string>("");
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [matchId, setMatchId] = useState<string | null>(null);
+  const [status, setStatus] = useState<MatchStatus | null>(null);
+  const [log, setLog] = useState<string[]>([]);
 
   useEffect(() => {
     if (!matchId) return;
     const s = io(SOCKET_URL, { transports: ["websocket"] });
-    s.on("connect", () => s.emit("subscribe", { matchId }));
-    s.on("status", (p: any) => setStatus(JSON.stringify(p)));
-    s.on("player_joined", (p: any) => setStatus("player_joined " + JSON.stringify(p)));
-    s.on("both_deposited", (p: any) => setStatus("both_deposited " + JSON.stringify(p)));
-    return () => { s.disconnect(); };
+    setSocket(s);
+
+    s.on("connect", () => s.emit("match:subscribe", matchId));
+    s.on(WsEvents.MatchJoined, (p: { id: string; status: MatchStatus }) => {
+      setStatus(p.status);
+      setLog((l) => [...l, `player joined: ${JSON.stringify(p)}`]);
+    });
+    s.on(WsEvents.MatchCommitted, (p: unknown) =>
+      setLog((l) => [...l, `commit: ${JSON.stringify(p)}`])
+    );
+    s.on(WsEvents.MatchRevealed, (p: unknown) =>
+      setLog((l) => [...l, `reveal: ${JSON.stringify(p)}`])
+    );
+
+    return () => {
+      s.disconnect();
+    };
   }, [matchId]);
 
-  const create = async () => {
-    const now = Math.floor(Date.now()/1000);
-    const r = await fetch("http://localhost:4000/api/matches", {
+  const createMatch = async () => {
+    const res = await fetch(`${API_URL}/api/matches`, {
       method: "POST",
-      headers: { "Content-Type":"application/json" },
-      body: JSON.stringify({
-        creatorWallet: "CREATOR_WALLET_PUBKEY",
-        stakeLamports: 1000000,
-        feeBps: 300,
-        feeWallet: "FEE_WALLET_PUBLIC_KEY_HERE",
-        commitDeadline: now + 300,
-        revealDeadline: now + 600
-      })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ wallet: "playerA", wager: "1" }),
     });
-    const j = await r.json();
-    setMatchId(j.id);
+    const data: { id: string } = await res.json();
+    setMatchId(data.id);
+    setStatus(MatchStatus.WaitingForPlayers);
+    setLog((l) => [...l, `match created: ${data.id}`]);
+  };
+
+  const joinMatch = async () => {
+    if (!matchId) return;
+    await fetch(`${API_URL}/api/matches/${matchId}/join`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ wallet: "playerB" }),
+    });
   };
 
   return (
-    <main style={{maxWidth:760, margin:"40px auto", padding:"0 16px"}}>
+    <main style={{ maxWidth: 760, margin: "40px auto", padding: "0 16px" }}>
       <h1>RPS on Solana (skeleton)</h1>
-      <button onClick={create} style={{padding:"8px 12px"}}>Create match</button>
-      {matchId && <p>Match ID: <code>{matchId}</code></p>}
-      <pre style={{background:"#111", color:"#0f0", padding:12, minHeight:120}}>{status}</pre>
-      <p style={{opacity:.7, marginTop:24}}>Connect Phantom + deposit/commit/reveal UI — TODO (каркас готов).</p>
+
+      {!matchId && (
+        <button onClick={createMatch} style={{ padding: "8px 12px" }}>
+          Create match
+        </button>
+      )}
+
+      {matchId && (
+        <>
+          <p>
+            Match ID: <code>{matchId}</code>
+          </p>
+          <p>
+            Status: <code>{status}</code>
+          </p>
+          <button onClick={joinMatch} style={{ padding: "8px 12px" }}>
+            Join match
+          </button>
+        </>
+      )}
+
+      {log.length > 0 && (
+        <pre
+          style={{
+            background: "#111",
+            color: "#0f0",
+            padding: 12,
+            minHeight: 120,
+            marginTop: 16,
+          }}
+        >
+          {log.join("\n")}
+        </pre>
+      )}
+
+      <p style={{ opacity: 0.7, marginTop: 24 }}>
+          Wallet connect + commit/reveal UI — coming next.
+      </p>
     </main>
   );
 }
